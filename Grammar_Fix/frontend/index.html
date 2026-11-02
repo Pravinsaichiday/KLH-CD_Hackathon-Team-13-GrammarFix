@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6fa">
+  <script>
+    (() => {
+      let theme = null;
+      try { theme = localStorage.getItem('grammarfix-theme-v2'); } catch (_) {}
+      if (!theme) theme = 'light';
+      document.documentElement.dataset.theme = theme;
+    })();
+  </script>
+  <title>Grammar Fix | Dangling-Else Resolver</title>
+  <meta name="description" content="An interactive Compiler Design workbench for understanding and resolving dangling-else ambiguity.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#top" aria-label="Grammar Fix home">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 36 36"><path d="M18 29V18M18 18L9 9M18 18l9-9M9 9v8m18-8v8"/><circle cx="18" cy="29" r="3"/><circle cx="9" cy="8" r="3"/><circle cx="27" cy="8" r="3"/></svg></span>
+        <span class="brand-copy"><strong>Grammar Fix</strong><small>COMPILER DESIGN · PS-04</small></span>
+      </a>
+      <nav class="topnav" aria-label="Main navigation">
+        <a href="#workspace">Workbench</a>
+        <a href="#tree-comparison">Parse trees</a>
+        <a href="#grammar-section">Grammar</a>
+        <a href="#test-section">Tests</a>
+      </nav>
+      <div class="top-actions">
+        <span id="backend-status" class="status-pill status-pending"><i></i><span>Connecting</span></span>
+        <button id="theme-toggle" class="icon-button" type="button" aria-label="Switch to dark theme" aria-pressed="false" title="Toggle colour theme">
+          <svg class="sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
+          <svg class="moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.2 15.2A8.5 8.5 0 0 1 8.8 3.8 8.7 8.7 0 1 0 20.2 15.2Z"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="page-shell">
+    <section id="top" class="hero">
+      <div class="eyebrow"><span></span> INTERACTIVE GRAMMAR WORKBENCH</div>
+      <div class="hero-row">
+        <div>
+          <h1>Understand the <em>dangling-else</em> problem.</h1>
+          <p>Explore why one nested <code>if-else</code> statement can have multiple parse trees, then resolve the ambiguity with matched and unmatched productions.</p>
+        </div>
+        <div class="hero-note"><span class="hero-note-icon">λ</span><span><strong>Compiler Design Lab</strong><small>Unit II · Top-Down Parsing</small></span></div>
+      </div>
+      <div class="summary-stats" aria-label="Latest analysis summary">
+        <div class="summary-stat"><span>PARSES BEFORE</span><strong id="stat-before">N/A</strong></div>
+        <div class="summary-stat"><span>PARSES AFTER</span><strong id="stat-after">N/A</strong></div>
+        <div class="summary-stat summary-verdict"><span>GRAMMAR STATUS</span><strong id="stat-verdict">Ready to analyze</strong></div>
+      </div>
+    </section>
+
+    <div id="alert-area" class="alert-area" role="status" aria-live="polite"></div>
+
+    <section id="workspace" class="workspace-grid">
+      <aside class="input-column" aria-label="Program input and controls">
+        <section class="panel editor-panel">
+          <div class="panel-kicker">01 / SOURCE INPUT</div>
+          <div class="panel-title-row"><h2>Program editor</h2><span class="micro-tag">MINI LANGUAGE</span></div>
+          <p class="section-copy">Enter a nested statement. The analyzer will tokenize it and find every valid reading under the original grammar.</p>
+          <div class="editor-shell">
+            <div class="editor-toolbar"><span><i></i> statement.gfx</span><span>Grammar Fix</span></div>
+            <label class="sr-only" for="input">Nested if-else statement</label>
+            <textarea id="input" spellcheck="false" autocapitalize="off">if e1 then
+    if e2 then
+        s1
+    else
+        s2</textarea>
+          </div>
+          <div class="editor-meta"><span id="char-count">0 characters</span><span>⌘ / Ctrl + Enter to analyze</span></div>
+          <p class="helper-text">Format: <code>if E then S</code> with optional <code>else S</code>. Use <code>e1</code>, <code>e2</code> for conditions and <code>s1</code>, <code>s2</code> for statements.</p>
+          <div class="action-stack">
+            <button id="analyze" class="btn btn-primary" type="button">Analyze grammar <span aria-hidden="true">↗</span></button>
+            <button id="witness" class="btn btn-secondary" type="button">Find an ambiguous string</button>
+          </div>
+          <div id="witness-out" class="witness-output" aria-live="polite"></div>
+          <div class="examples-block"><div class="minor-heading">TRY AN EXAMPLE</div><div id="examples" class="example-chips"></div></div>
+        </section>
+
+        <section class="panel builder-panel">
+          <div class="panel-kicker">02 / EXPERIMENT</div>
+          <div class="panel-title-row"><h2>Test-case builder</h2><span class="micro-tag">PLAYGROUND</span></div>
+          <p class="section-copy">Choose the nesting depth and decide which <code>if</code> levels receive an <code>else</code>.</p>
+          <label class="range-heading" for="depth">Nesting depth <output id="depth-out">3</output></label>
+          <input id="depth" class="depth-range" type="range" min="1" max="6" value="3">
+          <div id="levels" class="level-options"></div>
+          <div class="builder-preview"><span>GENERATED STRUCTURE</span><code id="builder-preview-text">if e1 then if e2 then if e3 then s</code></div>
+          <button id="build" class="btn btn-primary btn-block" type="button">Build and analyze</button>
+        </section>
+
+        <section id="grammar-section" class="panel grammar-editor-panel">
+          <details>
+            <summary><span class="panel-kicker">03 / GRAMMAR SETTINGS</span><strong>Original grammar editor</strong><span class="summary-indicator">+</span></summary>
+            <p class="section-copy">Edit the source CFG and analyze the effect. <code>E</code> represents a condition and <code>S</code> a simple statement.</p>
+            <label class="sr-only" for="grammar">Original grammar</label>
+            <textarea id="grammar" class="grammar-input" rows="6" spellcheck="false"></textarea>
+            <button id="reset-grammar" class="text-button" type="button">Reset to default grammar</button>
+          </details>
+        </section>
+
+        <section class="panel validate-panel">
+          <div class="panel-kicker">04 / VALIDATION</div>
+          <div class="panel-title-row"><h2>Test suite</h2><span class="micro-tag">9 CASES</span></div>
+          <p class="section-copy">Check the parser against simple, nested, ambiguous and invalid statements.</p>
+          <button id="run-tests" class="btn btn-secondary btn-block" type="button">Run built-in tests <span aria-hidden="true">→</span></button>
+        </section>
+      </aside>
+
+      <section class="analysis-column" aria-label="Compiler analysis results">
+        <div id="analysis-output" class="analysis-output" aria-live="polite">
+          <div class="panel empty-analysis">
+            <span class="empty-symbol">λ</span>
+            <div class="panel-kicker">ANALYSIS OUTPUT</div>
+            <h2>Your parse trees will appear here</h2>
+            <p>Start with the classic dangling-else example. Grammar Fix compares every valid reading before the transformation with the single reading after it.</p>
+            <button class="btn btn-primary" id="empty-analyze" type="button">Analyze example <span aria-hidden="true">↗</span></button>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section id="test-section" class="test-results-section panel">
+      <div class="panel-kicker">05 / REGRESSION CHECKS</div>
+      <div class="test-heading-row"><div><h2>Validation results</h2><p class="section-copy">Run the built-in test suite to confirm that the original grammar and the transformed grammar behave as expected.</p></div><span id="test-summary" class="test-summary">Not run yet</span></div>
+      <div id="test-results" class="test-results-empty">Run the test suite to see expected and actual parse counts for all included cases.</div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-top"><div><strong>Grammar Fix</strong><span>Compiler Design · Unit II: Top-Down Parsing · PS-04</span></div><span class="footer-note">A visual study of grammar ambiguity and resolution.</span></div>
+    <div class="team-credit"><strong>Made by Team - 13</strong><span>2420030290 - D. Kamal</span><span>2420030777 - C. Pravin Sai</span><span>2420090088 - H. Niranjan</span></div>
+  </footer>
+
+  <div id="toast-region" class="toast-region" aria-live="polite"></div>
+  <script src="app.js" defer></script>
+</body>
+</html>
